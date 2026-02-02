@@ -9,7 +9,8 @@ import torch
 import numpy as np
 import trimesh
 from PIL import Image
-from modelscope.pipelines import Trellis2TexturingPipeline
+from modelscope import snapshot_download
+from trellis2.pipelines import Trellis2TexturingPipeline
 
 
 MAX_SEED = np.iinfo(np.int32).max
@@ -145,7 +146,11 @@ with gr.Blocks(delete_cache=(600, 600)) as demo:
 if __name__ == "__main__":
     os.makedirs(TMP_DIR, exist_ok=True)
 
-    pipeline = Trellis2TexturingPipeline.from_pretrained('microsoft/TRELLIS.2-4B', config_file="texturing_pipeline.json")
+
+    # 指定模型ID，会从ModelScope镜像下载
+    model_dir = snapshot_download('microsoft/TRELLIS.2-4B')
+    print(f'模型已下载到: {model_dir}')
+    pipeline = Trellis2TexturingPipeline.from_pretrained(model_dir, config_file="texturing_pipeline.json")
     pipeline.cuda()
     
     demo.launch()
