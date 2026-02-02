@@ -5,6 +5,7 @@ from torchvision import transforms
 from transformers import DINOv3ViTModel
 import numpy as np
 from PIL import Image
+from modelscope import snapshot_download
 
 
 class DinoV2FeatureExtractor:
@@ -13,7 +14,8 @@ class DinoV2FeatureExtractor:
     """
     def __init__(self, model_name: str):
         self.model_name = model_name
-        self.model = torch.hub.load('facebookresearch/dinov2', model_name, pretrained=True)
+        model_dir = snapshot_download('facebookresearch/dinov2')
+        self.model = torch.hub.load(model_dir, pretrained=True)
         self.model.eval()
         self.transform = transforms.Compose([
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
