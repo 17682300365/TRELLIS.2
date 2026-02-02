@@ -29,6 +29,6 @@ dependencies = [
     "tqdm",
     "zstandard",
     "easydict",
-    "cumesh @ git+https://github.com/JeffreyXiang/CuMesh.git",
-    "flex_gemm @ git+https://github.com/JeffreyXiang/FlexGEMM.git",
+    "cumesh",
+    "flex_gemm",
 ]
