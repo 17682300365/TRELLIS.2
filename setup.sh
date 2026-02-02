@@ -56,15 +56,14 @@ if [ "$HELP" = true ] ; then
 fi
 
 # Get system information
-#WORKDIR=$(pwd)
-#if command -v nvidia-smi > /dev/null; then
-#    PLATFORM="cuda"
-#elif command -v rocminfo > /dev/null; then
-#    PLATFORM="hip"
-#else
-#    echo "Error: No supported GPU found"
-#    exit 1
-#fi
+WORKDIR=$(pwd)
+if command -v nvidia-smi > /dev/null; then
+    PLATFORM="cuda"
+elif command -v rocminfo > /dev/null; then
+    PLATFORM="hip"
+else
+    PLATFORM="cuda"
+fi
 
 if [ "$NEW_ENV" = true ] ; then
     conda create -n trellis2 python=3.10
