@@ -1,5 +1,5 @@
 from typing import *
-from transformers import AutoModelForImageSegmentation
+from modelscope import AutoModelForImageSegmentation
 import torch
 from torchvision import transforms
 from PIL import Image
