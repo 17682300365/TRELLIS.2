@@ -2,7 +2,7 @@ from typing import *
 import torch
 import torch.nn.functional as F
 from torchvision import transforms
-from transformers import DINOv3ViTModel
+from modelscope import DINOv3ViTModel
 import numpy as np
 from PIL import Image
 from modelscope import snapshot_download
