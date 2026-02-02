@@ -153,4 +153,4 @@ if __name__ == "__main__":
     pipeline = Trellis2TexturingPipeline.from_pretrained(model_dir, config_file="texturing_pipeline.json")
     pipeline.cuda()
     
-    demo.launch()
+    demo.launch(server_name="0.0.0.0", server_port=8889)
