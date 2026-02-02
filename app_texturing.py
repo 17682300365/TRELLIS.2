@@ -9,7 +9,7 @@ import torch
 import numpy as np
 import trimesh
 from PIL import Image
-from modelscope import Trellis2TexturingPipeline
+from modelscope.pipelines import Trellis2TexturingPipeline
 
 
 MAX_SEED = np.iinfo(np.int32).max
