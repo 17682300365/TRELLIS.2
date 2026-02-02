@@ -145,7 +145,7 @@ class Trellis2TexturingPipeline(Pipeline):
             if scale < 1:
                 input = input.resize((int(input.width * scale), int(input.height * scale)), Image.Resampling.LANCZOS)
             if getattr(self, 'rembg_session', None) is None:
-                self.rembg_session = rembg.new_session(model_path='/root/TRELLIS.2/u2net.onnx')
+                self.rembg_session = rembg.new_session(model_path='/root/trellis2/u2net.onnx')
             output = rembg.remove(input, session=self.rembg_session)
         output_np = np.array(output)
         alpha = output_np[:, :, 3]
