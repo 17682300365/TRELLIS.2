@@ -8,6 +8,7 @@ from typing import *
 import torch
 import numpy as np
 import trimesh
+import aspose.threed as a3d
 from PIL import Image
 from modelscope import snapshot_download
 from trellis2.pipelines import Trellis2TexturingPipeline
@@ -61,6 +62,14 @@ def shapeimage_to_tex(
     req: gr.Request,
     progress=gr.Progress(track_tqdm=True),
 ) -> str:
+    if mesh_file.lower().endswith('.jt'):
+        user_dir = os.path.join(TMP_DIR, str(req.session_hash))
+        os.makedirs(user_dir, exist_ok=True)
+        glb_temp_path = os.path.join(user_dir, os.path.basename(mesh_file).replace('.jt', '.glb'))
+        scene = a3d.Scene.from_file(mesh_file)
+        scene.save(glb_temp_path)
+        mesh_file = glb_temp_path
+
     mesh = trimesh.load(mesh_file)
     if isinstance(mesh, trimesh.Scene):
         mesh = mesh.to_mesh()
@@ -96,7 +105,7 @@ with gr.Blocks(delete_cache=(600, 600)) as demo:
     
     with gr.Row():
         with gr.Column(scale=1, min_width=360):
-            mesh_file = gr.File(label="Upload Mesh", file_types=[".ply", ".obj", ".glb", ".gltf"], file_count="single")
+            mesh_file = gr.File(label="Upload Mesh", file_types=[".ply", ".obj", ".glb", ".gltf", ".jt"], file_count="single")
             image_prompt = gr.Image(label="Image Prompt", format="png", image_mode="RGBA", type="pil", height=400)
             
             resolution = gr.Radio(["512", "1024", "1536"], label="Resolution", value="1024")
