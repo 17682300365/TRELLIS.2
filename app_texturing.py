@@ -9,6 +9,14 @@ import torch
 import numpy as np
 import trimesh
 import aspose.threed as a3d
+from OCC.Core.STEPControl import STEPControl_Reader
+from OCC.Core.IFSelect import IFSelect_RetDone
+from OCC.Display.SimpleGui import init_display
+from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
+from OCC.Core.StlAPI import StlAPI_Writer
+from OCC.Core.TopoDS import TopoDS_Shape
+import trimesh
+import os
 from PIL import Image
 from modelscope import snapshot_download
 from trellis2.pipelines import Trellis2TexturingPipeline
@@ -49,18 +57,58 @@ def get_seed(randomize_seed: bool, seed: int) -> int:
     return np.random.randint(0, MAX_SEED) if randomize_seed else seed
 
 
+def step_to_glb_via_stl(step_file, glb_file):
+    """
+    通过 STL 中间格式转换 STEP 到 GLB
+    """
+    # 1. 读取 STEP 文件
+    step_reader = STEPControl_Reader()
+    status = step_reader.ReadFile(step_file)
+
+    if status != IFSelect_RetDone:
+        print("无法读取 STEP 文件")
+        return False
+
+    step_reader.TransferRoots()
+    shape = step_reader.OneShape()
+
+    # 2. 转换为 STL
+    stl_file = "temp.stl"
+
+    # 创建网格
+    mesh = BRepMesh_IncrementalMesh(shape, 0.01, True)
+    mesh.Perform()
+
+    # 写入 STL
+    stl_writer = StlAPI_Writer()
+    stl_writer.Write(shape, stl_file)
+
+    # 3. STL 转 GLB
+    mesh_trimesh = trimesh.load(stl_file)
+
+    # 保存为 GLB
+    mesh_trimesh.export(glb_file)
+
+    # 清理临时文件
+    if os.path.exists(stl_file):
+        os.remove(stl_file)
+
+    print(f"转换完成: {glb_file}")
+    return True
+
+
 def shapeimage_to_tex(
-    mesh_file: str,
-    image: Image.Image,
-    seed: int,
-    resolution: str,
-    texture_size: int,
-    tex_slat_guidance_strength: float,
-    tex_slat_guidance_rescale: float,
-    tex_slat_sampling_steps: int,
-    tex_slat_rescale_t: float,
-    req: gr.Request,
-    progress=gr.Progress(track_tqdm=True),
+        mesh_file: str,
+        image: Image.Image,
+        seed: int,
+        resolution: str,
+        texture_size: int,
+        tex_slat_guidance_strength: float,
+        tex_slat_guidance_rescale: float,
+        tex_slat_sampling_steps: int,
+        tex_slat_rescale_t: float,
+        req: gr.Request,
+        progress=gr.Progress(track_tqdm=True),
 ) -> str:
     if mesh_file.lower().endswith('.jt'):
         user_dir = os.path.join(TMP_DIR, str(req.session_hash))
@@ -68,6 +116,13 @@ def shapeimage_to_tex(
         glb_temp_path = os.path.join(user_dir, os.path.basename(mesh_file).replace('.jt', '.glb'))
         scene = a3d.Scene.from_file(mesh_file)
         scene.save(glb_temp_path)
+        mesh_file = glb_temp_path
+    elif mesh_file.lower().endswith(('.stp', '.step')):
+        user_dir = os.path.join(TMP_DIR, str(req.session_hash))
+        os.makedirs(user_dir, exist_ok=True)
+        ext = os.path.splitext(mesh_file)[1]
+        glb_temp_path = os.path.join(user_dir, os.path.basename(mesh_file).replace(ext, '.glb'))
+        step_to_glb_via_stl(mesh_file, glb_temp_path)
         mesh_file = glb_temp_path
 
     mesh = trimesh.load(mesh_file)
@@ -105,32 +160,34 @@ with gr.Blocks(delete_cache=(600, 600)) as demo:
     
     with gr.Row():
         with gr.Column(scale=1, min_width=360):
-            mesh_file = gr.File(label="Upload Mesh", file_types=[".ply", ".obj", ".glb", ".gltf", ".jt"], file_count="single")
+            mesh_file = gr.File(label="Upload Mesh",
+                                file_types=[".ply", ".obj", ".glb", ".gltf", ".jt", ".stp", ".step"],
+                                file_count="single")
             image_prompt = gr.Image(label="Image Prompt", format="png", image_mode="RGBA", type="pil", height=400)
-            
+
             resolution = gr.Radio(["512", "1024", "1536"], label="Resolution", value="1024")
             seed = gr.Slider(0, MAX_SEED, label="Seed", value=0, step=1)
             randomize_seed = gr.Checkbox(label="Randomize Seed", value=True)
             texture_size = gr.Slider(1024, 4096, label="Texture Size", value=2048, step=1024)
-            
+
             generate_btn = gr.Button("Generate")
-                
-            with gr.Accordion(label="Advanced Settings", open=False):                
+
+            with gr.Accordion(label="Advanced Settings", open=False):
                 with gr.Row():
                     tex_slat_guidance_strength = gr.Slider(1.0, 10.0, label="Guidance Strength", value=1.0, step=0.1)
                     tex_slat_guidance_rescale = gr.Slider(0.0, 1.0, label="Guidance Rescale", value=0.0, step=0.01)
                     tex_slat_sampling_steps = gr.Slider(1, 50, label="Sampling Steps", value=12, step=1)
-                    tex_slat_rescale_t = gr.Slider(1.0, 6.0, label="Rescale T", value=3.0, step=0.1)                
+                    tex_slat_rescale_t = gr.Slider(1.0, 6.0, label="Rescale T", value=3.0, step=0.1)
 
         with gr.Column(scale=10):
-            glb_output = gr.Model3D(label="Extracted GLB", height=724, show_label=True, display_mode="solid", clear_color=(0.25, 0.25, 0.25, 1.0))
+            glb_output = gr.Model3D(label="Extracted GLB", height=724, show_label=True, display_mode="solid",
+                                    clear_color=(0.25, 0.25, 0.25, 1.0))
             download_btn = gr.DownloadButton(label="Download GLB")
-                        
 
     # Handlers
     demo.load(start_session)
     demo.unload(end_session)
-    
+
     image_prompt.upload(
         preprocess_image,
         inputs=[image_prompt],
@@ -149,17 +206,15 @@ with gr.Blocks(delete_cache=(600, 600)) as demo:
         ],
         outputs=[glb_output, download_btn],
     )
-        
 
 # Launch the Gradio app
 if __name__ == "__main__":
     os.makedirs(TMP_DIR, exist_ok=True)
-
 
     # 指定模型ID，会从ModelScope镜像下载
     model_dir = snapshot_download('microsoft/TRELLIS.2-4B')
     print(f'模型已下载到: {model_dir}')
     pipeline = Trellis2TexturingPipeline.from_pretrained(model_dir, config_file="texturing_pipeline.json")
     pipeline.cuda()
-    
+
     demo.launch(server_name="0.0.0.0", server_port=8889)
