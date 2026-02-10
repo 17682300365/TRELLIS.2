@@ -100,6 +100,7 @@ def step_to_glb_via_stl(step_file, glb_file):
 def shapeimage_to_tex(
         mesh_file: str,
         image: Image.Image,
+        text: str,
         seed: int,
         resolution: str,
         texture_size: int,
@@ -128,20 +129,35 @@ def shapeimage_to_tex(
     mesh = trimesh.load(mesh_file)
     if isinstance(mesh, trimesh.Scene):
         mesh = mesh.to_mesh()
-    output = pipeline.run(
-        mesh,
-        image,
-        seed=seed,
-        preprocess_image=False,
-        tex_slat_sampler_params={
-            "steps": tex_slat_sampling_steps,
-            "guidance_strength": tex_slat_guidance_strength,
-            "guidance_rescale": tex_slat_guidance_rescale,
-            "rescale_t": tex_slat_rescale_t,
-        },
-        resolution=int(resolution),
-        texture_size=texture_size,
-    )
+
+    if text.strip():
+        # Run the pipeline with text prompt
+        output = text_pipeline.run_variant(
+            mesh,
+            text,
+            seed=seed,
+            # Optional parameters
+            # slat_sampler_params={
+            #     "steps": 12,
+            #     "cfg_strength": 7.5,
+            # },
+        )
+    else:
+        # Run the pipeline with image prompt
+        output = pipeline.run(
+            mesh,
+            image,
+            seed=seed,
+            preprocess_image=False,
+            tex_slat_sampler_params={
+                "steps": tex_slat_sampling_steps,
+                "guidance_strength": tex_slat_guidance_strength,
+                "guidance_rescale": tex_slat_guidance_rescale,
+                "rescale_t": tex_slat_rescale_t,
+            },
+            resolution=int(resolution),
+            texture_size=texture_size,
+        )
     now = datetime.now()
     timestamp = now.strftime("%Y-%m-%dT%H%M%S") + f".{now.microsecond // 1000:03d}"
     user_dir = os.path.join(TMP_DIR, str(req.session_hash))
@@ -164,6 +180,7 @@ with gr.Blocks(delete_cache=(600, 600)) as demo:
                                 file_types=[".ply", ".obj", ".glb", ".gltf", ".jt", ".stp", ".step"],
                                 file_count="single")
             image_prompt = gr.Image(label="Image Prompt", format="png", image_mode="RGBA", type="pil", height=400)
+            text_prompt = gr.Textbox(label="Text Prompt", placeholder="Enter text description (optional, will use image if empty)", lines=2)
 
             resolution = gr.Radio(["512", "1024", "1536"], label="Resolution", value="1024")
             seed = gr.Slider(0, MAX_SEED, label="Seed", value=0, step=1)
@@ -201,7 +218,7 @@ with gr.Blocks(delete_cache=(600, 600)) as demo:
     ).then(
         shapeimage_to_tex,
         inputs=[
-            mesh_file, image_prompt, seed, resolution, texture_size,
+            mesh_file, image_prompt, text_prompt, seed, resolution, texture_size,
             tex_slat_guidance_strength, tex_slat_guidance_rescale, tex_slat_sampling_steps, tex_slat_rescale_t,
         ],
         outputs=[glb_output, download_btn],
@@ -216,5 +233,8 @@ if __name__ == "__main__":
     print(f'模型已下载到: {model_dir}')
     pipeline = Trellis2TexturingPipeline.from_pretrained(model_dir, config_file="texturing_pipeline.json")
     pipeline.cuda()
+    text_model_dir = snapshot_download('microsoft/TRELLIS-text-xlarge')
+    text_pipeline = TrellisTextTo3DPipeline.from_pretrained(text_model_dir)
+    text_pipeline.cuda()
 
     demo.launch(server_name="0.0.0.0", server_port=8889)
