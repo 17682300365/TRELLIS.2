@@ -1,6 +1,7 @@
 from typing import *
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 from PIL import Image
 import trimesh
@@ -407,6 +408,7 @@ class Trellis2TexturingPipeline(Pipeline):
         mesh = self.preprocess_mesh(mesh)
         torch.manual_seed(seed)
         cond = self.get_cond([image], 512) if resolution == 512 else self.get_cond([image], 1024)
+
         shape_slat = self.encode_shape_slat(mesh, resolution)
         tex_model = self.models['tex_slat_flow_model_512'] if resolution == 512 else self.models[
             'tex_slat_flow_model_1024']
