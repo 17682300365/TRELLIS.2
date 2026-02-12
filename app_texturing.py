@@ -57,39 +57,44 @@ def generate_image_from_text(prompt: str, seed: int = 42) -> Image.Image:
     """Generate image from text prompt using Z-Image, then unload to free GPU memory."""
     global text2img_pipeline
 
-    # Load pipeline
-    pipe = get_text2img_pipeline()
-    aspect_ratios = {
-        "1:1": (1024, 1024),
-        "16:9": (1664, 928),
-        "9:16": (928, 1664),
-        "4:3": (1472, 1104),
-        "3:4": (1104, 1472),
-        "3:2": (1584, 1056),
-        "2:3": (1056, 1584),
-    }
+    image = None
+    try:
+        # Load pipeline
+        pipe = get_text2img_pipeline()
+        aspect_ratios = {
+            "1:1": (1024, 1024),
+            "16:9": (1664, 928),
+            "9:16": (928, 1664),
+            "4:3": (1472, 1104),
+            "3:4": (1104, 1472),
+            "3:2": (1584, 1056),
+            "2:3": (1056, 1584),
+        }
 
-    width, height = aspect_ratios["1:1"]
-    negative_prompt = ""  # Optional, but would be powerful when you want to remove some unwanted content
-    image = pipe(
-        prompt=prompt,
-        negative_prompt=negative_prompt,
-        height=width,
-        width=height,
-        cfg_normalization=False,
-        num_inference_steps=50,
-        guidance_scale=4,
-        generator=torch.Generator("cuda").manual_seed(seed),
-    ).images[0]
-    image.save("output_t2i.png")
-    # Unload pipeline to free GPU memory for TRELLIS
-    print("Unloading Z-Image pipeline to free GPU memory...")
-    del text2img_pipeline
-    text2img_pipeline = None
-    torch.cuda.empty_cache()
-    torch.cuda.synchronize()
-    print("Z-Image pipeline unloaded. GPU memory freed.")
-    image = preprocess_image(image)
+        width, height = aspect_ratios["1:1"]
+        negative_prompt = ""  # Optional, but would be powerful when you want to remove some unwanted content
+        image = pipe(
+            prompt=prompt,
+            negative_prompt=negative_prompt,
+            height=width,
+            width=height,
+            cfg_normalization=False,
+            num_inference_steps=50,
+            guidance_scale=4,
+            generator=torch.Generator("cuda").manual_seed(seed),
+        ).images[0]
+        image.save("output_t2i.png")
+        image = preprocess_image(image)
+    finally:
+        # Unload pipeline to free GPU memory for TRELLIS
+        # 使用 finally 确保即使发生异常也能释放资源
+        print("Unloading Z-Image pipeline to free GPU memory...")
+        del text2img_pipeline
+        text2img_pipeline = None
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        print("Z-Image pipeline unloaded. GPU memory freed.")
+
     return image
 
 
